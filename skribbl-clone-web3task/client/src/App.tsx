@@ -511,6 +511,9 @@ function GameView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const current = useRef<Stroke | null>(null);
+  const lastEmittedPoint = useRef<Stroke["points"][number] | null>(null);
+  const pendingPoint = useRef<Stroke["points"][number] | null>(null);
+  const animationFrame = useRef<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -557,22 +560,53 @@ function GameView({
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawer || room.phase !== "drawing") return;
     drawing.current = true;
-    current.current = { points: [point(e)], color, size, eraser };
+    const firstPoint = point(e);
+    current.current = {
+      id: crypto.randomUUID(),
+      points: [firstPoint],
+      color,
+      size,
+      eraser
+    };
+    lastEmittedPoint.current = firstPoint;
+    pendingPoint.current = null;
     socket.emit("draw_start", current.current);
   };
 
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current || !current.current) return;
-    current.current.points.push(point(e));
-    socket.emit("draw_move", current.current);
+    const nextPoint = point(e);
+    current.current.points.push(nextPoint);
+    pendingPoint.current = nextPoint;
+    if (animationFrame.current === null) {
+      animationFrame.current = requestAnimationFrame(flushMove);
+    }
   };
 
   const end = () => {
     if (!drawing.current) return;
+    if (animationFrame.current !== null) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+    flushMove();
     drawing.current = false;
     current.current = null;
+    lastEmittedPoint.current = null;
+    pendingPoint.current = null;
     socket.emit("draw_end");
   };
+
+  function flushMove() {
+    animationFrame.current = null;
+    const stroke = current.current;
+    const from = lastEmittedPoint.current;
+    const to = pendingPoint.current;
+    if (!stroke || !from || !to || from === to) return;
+    socket.emit("draw_move", { ...stroke, points: [from, to] });
+    lastEmittedPoint.current = to;
+    pendingPoint.current = null;
+  }
 
   const chatLocked = isDrawer && (room.phase === "drawing" || room.phase === "choosing");
 

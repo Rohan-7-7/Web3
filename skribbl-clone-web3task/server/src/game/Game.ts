@@ -158,7 +158,15 @@ export class Game {
   }
 
   addStroke(stroke: Stroke) {
-    this.strokes.push(stroke);
+    const previous = this.strokes[this.strokes.length - 1];
+    if (stroke.id && previous?.id === stroke.id) {
+      previous.points.push(...stroke.points.slice(1));
+      return;
+    }
+    this.strokes.push({
+      ...stroke,
+      points: [...stroke.points]
+    });
   }
 
   undo() {

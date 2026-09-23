@@ -22,6 +22,7 @@ export interface Point {
 }
 
 export interface Stroke {
+  id?: string;
   points: Point[];
   color: string;
   size: number;

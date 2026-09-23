@@ -2,5 +2,11 @@ import { io } from "socket.io-client";
 
 export const socket = io(
   import.meta.env.VITE_SERVER_URL || "http://localhost:4000",
-  { autoConnect: false }
+  {
+    autoConnect: false,
+    transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    timeout: 10000
+  }
 );

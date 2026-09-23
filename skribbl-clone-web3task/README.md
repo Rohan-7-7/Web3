@@ -7,7 +7,7 @@
 - Drawing: HTML5 Canvas
 - State: In-memory game/room state
 
-## Features
+## Features-
 
 - Create/join rooms with a room code
 - Lobby with player list and ready state
