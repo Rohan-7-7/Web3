@@ -38,6 +38,9 @@ export default function App() {
   const [wordOptions, setWordOptions] = useState<string[]>([]);
   const [messages, setMessages] = useState<{name: string; text: string}[]>([]);
   const [error, setError] = useState("");
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">(
+    socket.connected ? "connected" : "connecting"
+  );
 
   useEffect(() => {
     if (name) localStorage.setItem("skribbl_name", name);
@@ -65,7 +68,13 @@ export default function App() {
     const onChat = (m: {playerName: string; text: string}) =>
       setMessages(prev => [...prev.slice(-49), { name: m.playerName, text: m.text }]);
     const onError = (msg: string) => setError(msg);
+    const onConnect = () => setConnectionStatus("connected");
+    const onDisconnect = () => setConnectionStatus("disconnected");
+    const onConnectError = () => setConnectionStatus("disconnected");
 
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("room_created", onRoomCreated);
     socket.on("room_state", onState);
     socket.on("word_options", onOptions);
@@ -74,6 +83,9 @@ export default function App() {
     socket.on("error_message", onError);
 
     return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("room_created", onRoomCreated);
       socket.off("room_state", onState);
       socket.off("word_options", onOptions);
@@ -85,8 +97,15 @@ export default function App() {
 
   const connect = () => {
     setError("");
+    setConnectionStatus("connecting");
     socket.connect();
   };
+
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+  }, []);
 
   const createPublicRoom = () => {
     if (!name.trim()) return setError("Enter your name");
@@ -158,6 +177,14 @@ export default function App() {
         <section className="card home">
           <h1>Sketch.io ✏️</h1>
           <h3>Draw. Guess. Score. Win.</h3>
+          <p className={`connection-status ${connectionStatus}`}>
+            <span aria-hidden="true" />
+            {connectionStatus === "connected"
+              ? "Connected"
+              : connectionStatus === "connecting"
+                ? "Connecting..."
+                : "Disconnected"}
+          </p>
 
           <div className="avatar-section">
             <h2>Choose your avatar</h2>

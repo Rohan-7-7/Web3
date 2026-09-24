@@ -134,6 +134,35 @@ input {
   color: #c2410c;
 }
 
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 12px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.connection-status span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.connection-status.connected {
+  color: #16a34a;
+}
+
+.connection-status.connecting {
+  color: #d97706;
+}
+
+.connection-status.disconnected {
+  color: #dc2626;
+}
+
 .home input {
   width: 100%; 
   margin: 8px 0; 
