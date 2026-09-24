@@ -547,6 +547,7 @@ function GameView({
   const lastEmittedPoint = useRef<Stroke["points"][number] | null>(null);
   const pendingPoints = useRef<Stroke["points"]>([]);
   const animationFrame = useRef<number | null>(null);
+  const liveStrokes = useRef(new Map<string, Stroke>());
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -557,13 +558,38 @@ function GameView({
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.lineCap = "round";
 
-    room.strokes.forEach(drawStroke);
+    liveStrokes.current.clear();
+    room.strokes.forEach(stroke => {
+      if (stroke.id) {
+        liveStrokes.current.set(stroke.id, {
+          ...stroke,
+          points: [...stroke.points]
+        });
+      }
+    });
+    redraw();
 
-    const onData = (stroke: Stroke) => drawStroke(stroke);
-    const onClear = () => ctx.clearRect(0, 0, rect.width, rect.height);
+    const onData = (stroke: Stroke) => {
+      if (stroke.id) {
+        const existing = liveStrokes.current.get(stroke.id);
+        if (existing) {
+          const newPoints = stroke.points.slice(existing.points.length > 0 ? 1 : 0);
+          existing.points.push(...newPoints);
+        } else {
+          liveStrokes.current.set(stroke.id, { ...stroke, points: [...stroke.points] });
+        }
+      }
+      redraw();
+    };
+    const onClear = () => {
+      liveStrokes.current.clear();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+    };
     const onUndo = () => {
       ctx.clearRect(0, 0, rect.width, rect.height);
-      room.strokes.slice(0, -1).forEach(drawStroke);
+      const lastId = [...liveStrokes.current.keys()].pop();
+      if (lastId) liveStrokes.current.delete(lastId);
+      redraw();
     };
     socket.on("draw_data", onData);
     socket.on("canvas_cleared", onClear);
@@ -573,6 +599,11 @@ function GameView({
       socket.off("canvas_cleared", onClear);
       socket.off("canvas_undo", onUndo);
     };
+
+    function redraw() {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      liveStrokes.current.forEach(drawStroke);
+    }
 
     function drawStroke(stroke: Stroke) {
       if (!stroke.points.length) return;
