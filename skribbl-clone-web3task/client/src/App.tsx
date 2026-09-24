@@ -162,6 +162,12 @@ export default function App() {
 
   const leaveLobby = () => {
     socket.emit("leave_room");
+    if (socket.connected) {
+      setConnectionStatus("connected");
+    } else {
+      setConnectionStatus("connecting");
+      socket.connect();
+    }
     setRoom(null);
     setMessages([]);
     setMyWord("");
