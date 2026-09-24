@@ -585,9 +585,9 @@ function GameView({
     }
   }, [room.round, room.strokes.length]);
 
-  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const point = (clientX: number, clientY: number) => {
     const r = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    return { x: clientX - r.left, y: clientY - r.top };
   };
 
   const drawLocally = (stroke: Stroke) => {
@@ -609,9 +609,15 @@ function GameView({
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawer || room.phase !== "drawing") return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "NotFoundError")) {
+        throw error;
+      }
+    }
     drawing.current = true;
-    const firstPoint = point(e);
+    const firstPoint = point(e.clientX, e.clientY);
     current.current = {
       id: crypto.randomUUID(),
       points: [firstPoint],
@@ -625,20 +631,33 @@ function GameView({
     socket.emit("draw_start", current.current);
   };
 
-  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current || !current.current) return;
-    const nextPoint = point(e);
-    current.current.points.push(nextPoint);
+  const appendPoint = (nextPoint: Stroke["points"][number]) => {
+    const stroke = current.current;
+    if (!drawing.current || !stroke) return;
+
+    const previousPoint = stroke.points[stroke.points.length - 1];
+    if (previousPoint.x === nextPoint.x && previousPoint.y === nextPoint.y) return;
+
+    stroke.points.push(nextPoint);
     pendingPoints.current.push(nextPoint);
-    const previousPoint = current.current.points[current.current.points.length - 2];
-    drawLocally({ ...current.current, points: [previousPoint, nextPoint] });
+    drawLocally({ ...stroke, points: [previousPoint, nextPoint] });
     if (animationFrame.current === null) {
       animationFrame.current = requestAnimationFrame(flushMove);
     }
   };
 
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing.current || !current.current) return;
+    const coalesced = e.nativeEvent.getCoalescedEvents?.();
+    const events = coalesced && coalesced.length > 0 ? coalesced : [e.nativeEvent];
+    events.forEach(sample => appendPoint(point(sample.clientX, sample.clientY)));
+  };
+
   const end = (e?: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current) return;
+    if (e) {
+      appendPoint(point(e.clientX, e.clientY));
+    }
     if (animationFrame.current !== null) {
       cancelAnimationFrame(animationFrame.current);
       animationFrame.current = null;
@@ -738,7 +757,7 @@ function GameView({
             onPointerDown={start}
             onPointerMove={move}
             onPointerUp={end}
-            onPointerLeave={end}
+            onPointerCancel={end}
           />
           {isDrawer && room.phase === "drawing" && (
             <div className="toolbar">
