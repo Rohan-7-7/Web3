@@ -18,6 +18,7 @@ export class Game {
   currentWord = "";
   wordOptions: string[] = [];
   timeLeft = 0;
+  turnEndsAt = 0;
   strokes: Stroke[] = [];
   hintIndices: number[] = [];
   guessedPlayerIds = new Set<string>();
@@ -62,6 +63,7 @@ export class Game {
     this.hintIndices = [];
     this.wordOptions = shuffle(WORDS).slice(0, Math.min(this.settings.wordCount || 3, WORDS.length));
     this.timeLeft = this.settings.drawTime;
+    this.turnEndsAt = 0;
     this.strokes = [];
 
     this.onRoundChange?.();
@@ -83,12 +85,13 @@ export class Game {
 
   private startTimer(players: Player[]) {
     this.clearTimer();
+    this.turnEndsAt = Date.now() + this.settings.drawTime * 1000;
     this.timer = setInterval(() => {
-      this.timeLeft -= 1;
-      if (this.timeLeft <= 0) {
+      this.timeLeft = Math.max(0, Math.ceil((this.turnEndsAt - Date.now()) / 1000));
+      if (Date.now() >= this.turnEndsAt) {
         this.endTurn(players);
       }
-    }, 1000);
+    }, 250);
   }
 
   /** Reveals unrevealed letters based on host-configured hint count and draw time. */

@@ -66,7 +66,7 @@ export default function App() {
       if (state.phase !== "lobby") setScreen("game");
       if (state.phase === "finished") setScreen("game");
     };
-    const onTick = (tick: Pick<RoomState, "timeLeft" | "phase" | "round" | "drawerId">) => {
+    const onTick = (tick: Pick<RoomState, "timeLeft" | "turnEndsAt" | "phase" | "round" | "drawerId" | "hintLetters">) => {
       setRoom(prev => prev ? { ...prev, ...tick } : prev);
     };
     const onOptions = ({ words }: { words: string[] }) => setWordOptions(words);
@@ -549,6 +549,7 @@ function GameView({
   const [color, setColor] = useState("#111827");
   const [size, setSize] = useState(5);
   const [eraser, setEraser] = useState(false);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const current = useRef<Stroke | null>(null);
@@ -556,6 +557,16 @@ function GameView({
   const pendingPoints = useRef<Stroke["points"]>([]);
   const animationFrame = useRef<number | null>(null);
   const liveStrokes = useRef(new Map<string, Stroke>());
+
+  useEffect(() => {
+    if (room.phase !== "drawing" || room.turnEndsAt <= 0) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 100);
+    return () => window.clearInterval(timer);
+  }, [room.phase, room.turnEndsAt]);
+
+  const displayedTimeLeft = room.phase === "drawing" && room.turnEndsAt > 0
+    ? Math.max(0, Math.ceil((room.turnEndsAt - clockNow) / 1000))
+    : room.timeLeft;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -756,7 +767,7 @@ function GameView({
     <main className="center">
       <header className="topbar">
         <strong>Round {room.round}/{room.totalRounds}</strong>
-        <span>⏱ {room.timeLeft}s</span>
+        <span>⏱ {displayedTimeLeft}s</span>
         {isDrawer ? (
           <span>Your word: <strong>{room.phase === "choosing" ? "Choose a word" : (myWord || "...")}</strong></span>
         ) : room.phase === "choosing" ? (

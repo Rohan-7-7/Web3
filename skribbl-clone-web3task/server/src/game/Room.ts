@@ -108,6 +108,7 @@ export class Room {
       totalRounds: this.settings.rounds,
       drawerId: this.game.drawerId,
       timeLeft: this.game.timeLeft,
+      turnEndsAt: this.game.turnEndsAt,
       strokes: this.game.strokes,
       wordLength: this.game.currentWord.length,
       hintLetters,

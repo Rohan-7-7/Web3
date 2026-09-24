@@ -34,11 +34,17 @@ function emitState(roomId: string) {
 function emitTick(roomId: string) {
   const room = manager.getRoom(roomId);
   if (!room) return;
+  const hintLetters: Record<number, string> = {};
+  for (const index of room.game.hintIndices) {
+    hintLetters[index] = room.game.currentWord[index] ?? "";
+  }
   io.to(room.id).emit("room_tick", {
     timeLeft: room.game.timeLeft,
+    turnEndsAt: room.game.turnEndsAt,
     phase: room.game.phase,
     round: room.game.round,
-    drawerId: room.game.drawerId
+    drawerId: room.game.drawerId,
+    hintLetters
   });
 }
 

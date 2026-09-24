@@ -40,6 +40,7 @@ export interface RoomState {
   totalRounds: number;
   drawerId: string | null;
   timeLeft: number;
+  turnEndsAt: number;
   strokes: Stroke[];
   wordLength: number;
   /** index → revealed character */

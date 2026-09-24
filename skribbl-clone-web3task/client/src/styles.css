@@ -765,6 +765,9 @@ input {
 .board { 
   position: relative; 
   min-height: 650px; 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 canvas { 
@@ -772,6 +775,7 @@ canvas {
   height: auto;
   aspect-ratio: 4 / 3;
   display: block; background: white; 
+  margin: 0 auto;
   box-shadow: 0 0 0 2px #e5e7eb;
   border-radius: 12px; 
   touch-action: none; 
