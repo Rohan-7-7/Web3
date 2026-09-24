@@ -41,6 +41,7 @@ export interface RoomState {
   drawerId: string | null;
   timeLeft: number;
   turnEndsAt: number;
+  serverNow: number;
   strokes: Stroke[];
   wordLength: number;
   /** index → revealed character */

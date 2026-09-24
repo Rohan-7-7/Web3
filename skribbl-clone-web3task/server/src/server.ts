@@ -41,6 +41,7 @@ function emitTick(roomId: string) {
   io.to(room.id).emit("room_tick", {
     timeLeft: room.game.timeLeft,
     turnEndsAt: room.game.turnEndsAt,
+    serverNow: Date.now(),
     phase: room.game.phase,
     round: room.game.round,
     drawerId: room.game.drawerId,

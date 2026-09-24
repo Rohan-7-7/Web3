@@ -43,6 +43,7 @@ export interface RoomSnapshot {
   drawerId: string | null;
   timeLeft: number;
   turnEndsAt: number;
+  serverNow: number;
   strokes: Stroke[];
   wordLength: number;
   /** Map of revealed letter index → actual character, for non-drawer players */

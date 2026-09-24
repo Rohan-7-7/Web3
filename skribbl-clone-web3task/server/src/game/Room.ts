@@ -109,6 +109,7 @@ export class Room {
       drawerId: this.game.drawerId,
       timeLeft: this.game.timeLeft,
       turnEndsAt: this.game.turnEndsAt,
+      serverNow: Date.now(),
       strokes: this.game.strokes,
       wordLength: this.game.currentWord.length,
       hintLetters,

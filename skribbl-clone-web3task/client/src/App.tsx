@@ -66,7 +66,7 @@ export default function App() {
       if (state.phase !== "lobby") setScreen("game");
       if (state.phase === "finished") setScreen("game");
     };
-    const onTick = (tick: Pick<RoomState, "timeLeft" | "turnEndsAt" | "phase" | "round" | "drawerId" | "hintLetters">) => {
+    const onTick = (tick: Pick<RoomState, "timeLeft" | "turnEndsAt" | "serverNow" | "phase" | "round" | "drawerId" | "hintLetters">) => {
       setRoom(prev => prev ? { ...prev, ...tick } : prev);
     };
     const onOptions = ({ words }: { words: string[] }) => setWordOptions(words);
@@ -550,6 +550,7 @@ function GameView({
   const [size, setSize] = useState(5);
   const [eraser, setEraser] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.now());
+  const serverClockOffset = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const current = useRef<Stroke | null>(null);
@@ -559,13 +560,19 @@ function GameView({
   const liveStrokes = useRef(new Map<string, Stroke>());
 
   useEffect(() => {
+    if (room.serverNow > 0) {
+      serverClockOffset.current = room.serverNow - Date.now();
+    }
+  }, [room.serverNow]);
+
+  useEffect(() => {
     if (room.phase !== "drawing" || room.turnEndsAt <= 0) return;
     const timer = window.setInterval(() => setClockNow(Date.now()), 100);
     return () => window.clearInterval(timer);
   }, [room.phase, room.turnEndsAt]);
 
   const displayedTimeLeft = room.phase === "drawing" && room.turnEndsAt > 0
-    ? Math.max(0, Math.ceil((room.turnEndsAt - clockNow) / 1000))
+    ? Math.max(0, Math.ceil((room.turnEndsAt - (clockNow + serverClockOffset.current)) / 1000))
     : room.timeLeft;
 
   useEffect(() => {
