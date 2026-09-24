@@ -545,7 +545,7 @@ function GameView({
   const drawing = useRef(false);
   const current = useRef<Stroke | null>(null);
   const lastEmittedPoint = useRef<Stroke["points"][number] | null>(null);
-  const pendingPoint = useRef<Stroke["points"][number] | null>(null);
+  const pendingPoints = useRef<Stroke["points"]>([]);
   const animationFrame = useRef<number | null>(null);
 
   useEffect(() => {
@@ -620,7 +620,7 @@ function GameView({
       eraser
     };
     lastEmittedPoint.current = firstPoint;
-    pendingPoint.current = null;
+    pendingPoints.current = [];
     drawLocally(current.current);
     socket.emit("draw_start", current.current);
   };
@@ -629,7 +629,7 @@ function GameView({
     if (!drawing.current || !current.current) return;
     const nextPoint = point(e);
     current.current.points.push(nextPoint);
-    pendingPoint.current = nextPoint;
+    pendingPoints.current.push(nextPoint);
     const previousPoint = current.current.points[current.current.points.length - 2];
     drawLocally({ ...current.current, points: [previousPoint, nextPoint] });
     if (animationFrame.current === null) {
@@ -650,7 +650,7 @@ function GameView({
     }
     current.current = null;
     lastEmittedPoint.current = null;
-    pendingPoint.current = null;
+    pendingPoints.current = [];
     socket.emit("draw_end");
   };
 
@@ -658,11 +658,11 @@ function GameView({
     animationFrame.current = null;
     const stroke = current.current;
     const from = lastEmittedPoint.current;
-    const to = pendingPoint.current;
-    if (!stroke || !from || !to || from === to) return;
-    socket.emit("draw_move", { ...stroke, points: [from, to] });
-    lastEmittedPoint.current = to;
-    pendingPoint.current = null;
+    const points = pendingPoints.current;
+    if (!stroke || !from || points.length === 0) return;
+    socket.emit("draw_move", { ...stroke, points: [from, ...points] });
+    lastEmittedPoint.current = points[points.length - 1];
+    pendingPoints.current = [];
   }
 
   const chatLocked = isDrawer && (room.phase === "drawing" || room.phase === "choosing");

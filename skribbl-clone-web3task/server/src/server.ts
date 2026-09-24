@@ -21,6 +21,7 @@ const io = new Server(httpServer, {
 
 const manager = new GameManager();
 const socketRooms = new Map<string, string>();
+const announcedLeaves = new Set<string>();
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
@@ -309,7 +310,9 @@ io.on("connection", socket => {
 
     const player = room.players.get(sock.id);
     room.removePlayer(sock.id);
-    if (player) {
+    const leaveKey = `${room.id}:${sock.id}`;
+    if (player && !announcedLeaves.has(leaveKey)) {
+      announcedLeaves.add(leaveKey);
       io.to(room.id).emit("chat_message", {
         playerId: "system",
         playerName: "System",
@@ -318,6 +321,11 @@ io.on("connection", socket => {
     }
     emitState(room.id);
     manager.deleteIfEmpty(room.id);
+    if (!room.players.size) {
+      for (const key of announcedLeaves) {
+        if (key.startsWith(`${room.id}:`)) announcedLeaves.delete(key);
+      }
+    }
   }
 
   function handleStroke(socketId: string, stroke: Stroke) {
