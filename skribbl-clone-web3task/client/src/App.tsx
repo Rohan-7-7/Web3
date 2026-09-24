@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { socket } from "./socket";
 import type { RoomState, Settings, Stroke } from "./types";
 
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 600;
+
 const avatars = ["👨🏻","👽","👩🏻","🐻","🦁","🦝","🦹🏻‍♂️","🦄","🧑🏻‍🎨","🧑🏻‍🚀","🦸🏻‍♀️","🥷🏻"];
 
 const COLORS = [
@@ -63,6 +66,9 @@ export default function App() {
       if (state.phase !== "lobby") setScreen("game");
       if (state.phase === "finished") setScreen("game");
     };
+    const onTick = (tick: Pick<RoomState, "timeLeft" | "phase" | "round" | "drawerId">) => {
+      setRoom(prev => prev ? { ...prev, ...tick } : prev);
+    };
     const onOptions = ({ words }: { words: string[] }) => setWordOptions(words);
     const onWord = ({ word }: { word: string }) => setMyWord(word);
     const onChat = (m: {playerName: string; text: string}) =>
@@ -77,6 +83,7 @@ export default function App() {
     socket.on("connect_error", onConnectError);
     socket.on("room_created", onRoomCreated);
     socket.on("room_state", onState);
+    socket.on("room_tick", onTick);
     socket.on("word_options", onOptions);
     socket.on("your_word", onWord);
     socket.on("chat_message", onChat);
@@ -88,6 +95,7 @@ export default function App() {
       socket.off("connect_error", onConnectError);
       socket.off("room_created", onRoomCreated);
       socket.off("room_state", onState);
+      socket.off("room_tick", onTick);
       socket.off("word_options", onOptions);
       socket.off("your_word", onWord);
       socket.off("chat_message", onChat);
@@ -553,10 +561,11 @@ function GameView({
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * devicePixelRatio;
-    canvas.height = rect.height * devicePixelRatio;
+    canvas.width = CANVAS_WIDTH * devicePixelRatio;
+    canvas.height = CANVAS_HEIGHT * devicePixelRatio;
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
     liveStrokes.current.clear();
     room.strokes.forEach(stroke => {
@@ -573,20 +582,23 @@ function GameView({
       if (stroke.id) {
         const existing = liveStrokes.current.get(stroke.id);
         if (existing) {
-          const newPoints = stroke.points.slice(existing.points.length > 0 ? 1 : 0);
+          const newPoints = stroke.points.slice(1);
           existing.points.push(...newPoints);
+          drawStroke({ ...stroke, points: [existing.points[existing.points.length - newPoints.length - 1], ...newPoints] });
         } else {
           liveStrokes.current.set(stroke.id, { ...stroke, points: [...stroke.points] });
+          drawStroke(stroke);
         }
+      } else {
+        drawStroke(stroke);
       }
-      redraw();
     };
     const onClear = () => {
       liveStrokes.current.clear();
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     };
     const onUndo = () => {
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       const lastId = [...liveStrokes.current.keys()].pop();
       if (lastId) liveStrokes.current.delete(lastId);
       redraw();
@@ -601,7 +613,7 @@ function GameView({
     };
 
     function redraw() {
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       liveStrokes.current.forEach(drawStroke);
     }
 
@@ -614,11 +626,14 @@ function GameView({
       stroke.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
       ctx.stroke();
     }
-  }, [room.round, room.strokes.length]);
+  }, [room.round, room.drawerId, room.phase]);
 
   const point = (clientX: number, clientY: number) => {
     const r = canvasRef.current!.getBoundingClientRect();
-    return { x: clientX - r.left, y: clientY - r.top };
+    return {
+      x: Math.round(((clientX - r.left) / r.width) * CANVAS_WIDTH * 10) / 10,
+      y: Math.round(((clientY - r.top) / r.height) * CANVAS_HEIGHT * 10) / 10
+    };
   };
 
   const drawLocally = (stroke: Stroke) => {
@@ -630,6 +645,7 @@ function GameView({
     ctx.lineWidth = stroke.size;
     ctx.strokeStyle = stroke.eraser ? "#ffffff" : stroke.color;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
     stroke.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     if (stroke.points.length === 1) {
@@ -656,6 +672,7 @@ function GameView({
       size,
       eraser
     };
+    liveStrokes.current.set(current.current.id!, current.current);
     lastEmittedPoint.current = firstPoint;
     pendingPoints.current = [];
     drawLocally(current.current);
@@ -703,6 +720,8 @@ function GameView({
     pendingPoints.current = [];
     socket.emit("draw_end");
   };
+
+  const cancel = () => end();
 
   function flushMove() {
     animationFrame.current = null;
@@ -788,7 +807,7 @@ function GameView({
             onPointerDown={start}
             onPointerMove={move}
             onPointerUp={end}
-            onPointerCancel={end}
+            onPointerCancel={cancel}
           />
           {isDrawer && room.phase === "drawing" && (
             <div className="toolbar">

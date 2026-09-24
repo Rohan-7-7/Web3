@@ -31,6 +31,17 @@ function emitState(roomId: string) {
   io.to(room.id).emit("room_state", room.snapshot());
 }
 
+function emitTick(roomId: string) {
+  const room = manager.getRoom(roomId);
+  if (!room) return;
+  io.to(room.id).emit("room_tick", {
+    timeLeft: room.game.timeLeft,
+    phase: room.game.phase,
+    round: room.game.round,
+    drawerId: room.game.drawerId
+  });
+}
+
 function emitRoundStart(room: ReturnType<GameManager["createRoom"]>) {
   io.to(room.id).emit("round_start", {
     drawerId: room.game.drawerId,
@@ -342,7 +353,7 @@ setInterval(() => {
   for (const roomId of new Set(socketRooms.values())) {
     const room = manager.getRoom(roomId);
     if (!room) continue;
-    emitState(room.id);
+    emitTick(room.id);
   }
 }, 1000);
 
