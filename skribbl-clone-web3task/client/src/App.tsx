@@ -584,8 +584,26 @@ function GameView({
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
+  const drawLocally = (stroke: Stroke) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !stroke.points.length) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.beginPath();
+    ctx.lineWidth = stroke.size;
+    ctx.strokeStyle = stroke.eraser ? "#ffffff" : stroke.color;
+    ctx.lineCap = "round";
+    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+    stroke.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    if (stroke.points.length === 1) {
+      ctx.lineTo(stroke.points[0].x + 0.01, stroke.points[0].y);
+    }
+    ctx.stroke();
+  };
+
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawer || room.phase !== "drawing") return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     drawing.current = true;
     const firstPoint = point(e);
     current.current = {
@@ -597,6 +615,7 @@ function GameView({
     };
     lastEmittedPoint.current = firstPoint;
     pendingPoint.current = null;
+    drawLocally(current.current);
     socket.emit("draw_start", current.current);
   };
 
@@ -605,12 +624,14 @@ function GameView({
     const nextPoint = point(e);
     current.current.points.push(nextPoint);
     pendingPoint.current = nextPoint;
+    const previousPoint = current.current.points[current.current.points.length - 2];
+    drawLocally({ ...current.current, points: [previousPoint, nextPoint] });
     if (animationFrame.current === null) {
       animationFrame.current = requestAnimationFrame(flushMove);
     }
   };
 
-  const end = () => {
+  const end = (e?: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current) return;
     if (animationFrame.current !== null) {
       cancelAnimationFrame(animationFrame.current);
@@ -618,6 +639,9 @@ function GameView({
     }
     flushMove();
     drawing.current = false;
+    if (e && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
     current.current = null;
     lastEmittedPoint.current = null;
     pendingPoint.current = null;

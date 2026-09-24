@@ -61,8 +61,13 @@ io.on("connection", socket => {
 
   socket.on("quick_join", ({ playerName, avatar, settings }: { playerName: string; avatar?: string; settings?: RoomSettings }) => {
     try {
+      const currentRoomId = socketRooms.get(socket.id);
+      if (currentRoomId) {
+        leaveCurrentRoom(socket);
+      }
+
       const name = playerName.trim();
-      const existing = manager.findPublicRoom();
+      const existing = manager.findPublicRoom(new Set(io.sockets.sockets.keys()));
       if (existing) {
         existing.onGameChange = () => {
           emitRoundStart(existing);
@@ -320,7 +325,7 @@ io.on("connection", socket => {
     const room = roomId ? manager.getRoom(roomId) : undefined;
     if (!room || !room.game.isDrawer(socketId) || room.game.phase !== "drawing") return;
     room.addStroke(stroke);
-    io.to(room.id).emit("draw_data", stroke);
+    io.to(room.id).except(socketId).emit("draw_data", stroke);
   }
 });
 

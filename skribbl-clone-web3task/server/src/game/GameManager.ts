@@ -15,8 +15,13 @@ export class GameManager {
     return room;
   }
 
-  findPublicRoom(): Room | undefined {
+  findPublicRoom(activeSocketIds: ReadonlySet<string>): Room | undefined {
     for (const room of this.rooms.values()) {
+      for (const player of room.players.values()) {
+        if (!activeSocketIds.has(player.id)) {
+          room.removePlayer(player.id);
+        }
+      }
       if (!room.isPrivate && room.game.phase === "lobby" && room.players.size < room.settings.maxPlayers) {
         return room;
       }
